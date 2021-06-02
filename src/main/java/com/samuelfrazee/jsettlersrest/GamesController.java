@@ -63,6 +63,22 @@ public class GamesController {
         return gameClient.getGamePlayers(gameId);
     }
 
+    @GetMapping("/{gameId}/currentPlayer")
+    public String getCurrentPlayer(@PathVariable String gameId) {
+        JSettlersClient gameClient = JsettlersrestApplication.jsettlersClient;
+        SOCGame game = gameClient.getGame(gameId);
+
+        if (game == null) {
+            throw new GameNotFoundException(gameId);
+        }
+
+        if (game.getCurrentPlayerNumber() <= 0) {
+            return "";
+        } else {
+            return game.getPlayer(game.getCurrentPlayerNumber()).getName();
+        }
+    }
+
     @PostMapping("{gameId}/action")
     public ResponseEntity<String> postGameAction(@PathVariable String gameId, @RequestBody Map<String, Object> gameAction) {
         JSettlersClient gameClient = JsettlersrestApplication.jsettlersClient;
@@ -96,6 +112,7 @@ public class GamesController {
         }
 
         if (actionType.equals("buyDevCard")) {
+            System.out.println("Client trying to buy dev card");
             gameClient.buyDevCard(game);
             //TODO: better checking if we actually could buy a dev card
             return ResponseEntity.ok().build();
@@ -211,7 +228,7 @@ public class GamesController {
 
             try {
                 @SuppressWarnings("unchecked")
-                Map<String, Object> maybeGetMap = (Map<String, Object>)args.get("give");
+                Map<String, Object> maybeGetMap = (Map<String, Object>)args.get("get");
 
                 getMap = maybeGetMap;
             } catch (ClassCastException e) {
@@ -274,6 +291,9 @@ public class GamesController {
                 get.add(resourceCount, rType);
             }
 
+            System.out.println("Got bank trade:");
+            System.out.println(give);
+            System.out.println(get);
             gameClient.bankTrade(game, give, get);
 
             return ResponseEntity.ok().build();
@@ -293,16 +313,15 @@ public class GamesController {
 
         } else if (actionType.equals("moveRobber")) {
             int coord;
-            SOCPlayer targetPlayer;
+            SOCPlayer targetPlayer = null;
 
             if (args.get("targetPlayer") instanceof String) {
                 targetPlayer = game.getPlayer((String) args.get("targetPlayer"));
-            } else {
+                if (targetPlayer == null) {
+                    return ResponseEntity.badRequest().body("No player named \"" + args.get("targetPlayer") + "\" at this game");
+                }
+            } else if (args.get("targetPlayer") != null) {
                 return ResponseEntity.badRequest().body("targetPlayer not a string");
-            }
-
-            if (targetPlayer == null) {
-                return ResponseEntity.badRequest().body("No player named \"" + args.get("targetPlayer") + "\" at this game");
             }
 
             try {
@@ -312,11 +331,53 @@ public class GamesController {
             }
 
             gameClient.moveRobber(game, gameClient.getMyPlayer(game), coord);
-            gameClient.choosePlayer(game, targetPlayer.getPlayerNumber());
 
+            if(targetPlayer != null) {
+                gameClient.choosePlayer(game, targetPlayer.getPlayerNumber());
+            }
+
+            return ResponseEntity.ok().build();
+
+        } else if (actionType.equals("discard")) {
+            SOCResourceSet resourcesToDiscard = new SOCResourceSet();
+
+            System.out.println(args);
+
+            if (args.get("wheat") instanceof Integer) {
+                resourcesToDiscard.add((Integer) args.get("wheat"), SOCResourceConstants.WHEAT);
+            }
+            if (args.get("wood") instanceof Integer) {
+                resourcesToDiscard.add((Integer) args.get("wood"), SOCResourceConstants.WOOD);
+            }
+            if (args.get("ore") instanceof Integer) {
+                resourcesToDiscard.add((Integer) args.get("ore"), SOCResourceConstants.ORE);
+            }
+            if (args.get("sheep") instanceof Integer) {
+                resourcesToDiscard.add((Integer) args.get("sheep"), SOCResourceConstants.SHEEP);
+            }
+            if (args.get("clay") instanceof Integer) {
+                resourcesToDiscard.add((Integer) args.get("clay"), SOCResourceConstants.CLAY);
+            }
+            System.out.println("Client trying to discard:");
+            System.out.println(resourcesToDiscard);
+            gameClient.discard(game, resourcesToDiscard);
+
+            return ResponseEntity.ok().build();
         }
 
         return ResponseEntity.badRequest().body("\"" + actionType + "\" is not a valid action");
+    }
+
+    @GetMapping("{gameId}/lastRoll")
+    public Integer getLastRoll(@PathVariable String gameId) {
+        JSettlersClient gameClient = JsettlersrestApplication.jsettlersClient;
+        SOCGame game = gameClient.getGame(gameId);
+
+        if (game == null) {
+            throw new GameNotFoundException(gameId);
+        }
+
+        return game.getCurrentDice();
     }
 
 }

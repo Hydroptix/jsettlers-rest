@@ -5,8 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import org.springframework.stereotype.Component;
-import soc.game.SOCPlayer;
-import soc.game.SOCPlayingPiece;
+import soc.game.*;
 
 import java.io.IOException;
 
@@ -28,10 +27,50 @@ public class SOCPlayerSerializer extends StdSerializer<SOCPlayer> {
         jgen.writeNumberField("numSettlements", player.getNumPieces(SOCPlayingPiece.SETTLEMENT));
         jgen.writeNumberField("numCities", player.getNumPieces(SOCPlayingPiece.CITY));
         jgen.writeNumberField("numRoads", player.getNumPieces(SOCPlayingPiece.ROAD));
-        jgen.writeObjectField("pieces", player.getPieces());
-        jgen.writeObjectField("roadsAndShips", player.getRoadsAndShips());
-        jgen.writeObjectField("settlements", player.getSettlements());
-        jgen.writeObjectField("cities", player.getCities());
+
+        // Prevent infinite JSON recursion
+        jgen.writeArrayFieldStart("pieces");
+        for (SOCPlayingPiece piece : player.getPieces()) {
+            jgen.writeStartObject();
+            jgen.writeStringField("type", SOCPlayingPiece.getTypeName(piece.getType()));
+            jgen.writeStringField("player", piece.getPlayer().getName());
+            jgen.writeNumberField("playerNumber", piece.getPlayerNumber());
+            jgen.writeNumberField("coordinates", piece.getCoordinates());
+            jgen.writeEndObject();
+        }
+        jgen.writeEndArray();
+
+        jgen.writeArrayFieldStart("roadsAndShips");
+        for (SOCRoutePiece piece : player.getRoadsAndShips()) {
+            jgen.writeStartObject();
+            jgen.writeStringField("type", piece.getTypeName(piece.getType()));
+            jgen.writeStringField("player", piece.getPlayer().getName());
+            jgen.writeNumberField("playerNumber", piece.getPlayerNumber());
+            jgen.writeNumberField("coordinates", piece.getCoordinates());
+            jgen.writeEndObject();
+        }
+        jgen.writeEndArray();
+
+        jgen.writeArrayFieldStart("settlements");
+        for(SOCSettlement piece: player.getSettlements()) {
+            jgen.writeStartObject();
+            jgen.writeStringField("player", piece.getPlayer().getName());
+            jgen.writeNumberField("playerNumber", piece.getPlayerNumber());
+            jgen.writeNumberField("coordinates", piece.getCoordinates());
+            jgen.writeEndObject();
+        }
+        jgen.writeEndArray();
+
+        jgen.writeArrayFieldStart("cities");
+        for(SOCCity piece: player.getCities()) {
+            jgen.writeStartObject();
+            jgen.writeStringField("player", piece.getPlayer().getName());
+            jgen.writeNumberField("playerNumber", piece.getPlayerNumber());
+            jgen.writeNumberField("coordinates", piece.getCoordinates());
+            jgen.writeEndObject();
+        }
+        jgen.writeEndArray();
+
         jgen.writeNumberField("lastSettlementCoord", player.getLastSettlementCoord());
         jgen.writeNumberField("lastRoadCoord", player.getLastRoadCoord());
         jgen.writeNumberField("longestRoadLength", player.getLongestRoadLength());
